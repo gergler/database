@@ -86,30 +86,35 @@ where task.creator = client.login
 group by client.login, extract(MONTH from data_beginning);
 
 --3
+-- cost - затрачено/ mark - оценка, сколько нужно затратить
 
-select login, sum(over.cost - over.mark), sum(undo.mark - undo.cost)
+select login id_executor,
+       (sum(mark - cost) + abs(sum(mark - cost))) / 2 as "-",
+       (sum(cost - mark) + abs(sum(cost - mark))) / 2 as "+"
 from client,
-     task over,
-     task undo
-where client.login = over.responsible
-  and over.responsible = undo.responsible
-  and over.mark < over.cost
-  and undo.mark > undo.cost
+     task
+where client.login = responsible
 group by login;
 
-select login, sum(a.undo), sum(b.over)
+select login id_executor, sum(b.over) "-", sum(a.undo) "+"
 from client,
-     (select (mark - cost) as undo, responsible from task where mark > cost) as a,
-     (select (cost - mark) as over, responsible from task where mark < cost) as b
+     (select (mark - cost) as undo, responsible from task) as a,
+     (select (cost - mark) as over, responsible from task) as b
 where client.login = a.responsible
-and a.responsible = b.responsible
+  and a.responsible = b.responsible
 group by login;
 
 --4
 
-     select creator,
-     responsible from task
+select creator,
+       responsible
+from task
 group by creator, responsible;
+
+
+(select creator, responsible from task where creator > task.responsible) union
+(select creator, responsible from task where creator < task.responsible) union
+(select creator, responsible from task where creator = task.responsible);
 
 --5
 
@@ -136,7 +141,7 @@ values ('HELLO WORLD');
 insert into varchar_tbl
 values ('HELLO WORLD');
 
-select sum(pg_column_size(char_tbl.str)), sum(pg_column_size(varchar_tbl.str))
+select sum(pg_column_size(char_tbl.str)) "char", sum(pg_column_size(varchar_tbl.str)) "varchar"
 from char_tbl,
      varchar_tbl;
 
@@ -145,6 +150,8 @@ from char_tbl,
 select responsible, max(priority)
 from task
 group by responsible;
+
+-------------------------------------
 
 select login, max(priority)
 from client,
@@ -157,41 +164,23 @@ group by login, responsible;
 select responsible, sum(mark)
 from task,
      (select avg(mark) from task) as average
-where task.mark > average.avg
-group by responsible, average.avg;
+group by responsible, mark, average.avg
+having mark > average.avg;
 
 --9
-drop view if exists counter, complete, delayed;
+drop view if exists table_view;
 
-create view counter as
-select task.responsible,
-       count(task.responsible)
+create view table_view as
+select *
 from task
-group by task.responsible;
-
-
-create view complete as
-select responsible,
-       count(responsible)
-from task
-where cost <= task.mark
-group by responsible;
-
-
-create view delayed as
-select responsible,
-       count(responsible)
-from task
-where task.cost > task.mark
-group by responsible;
+         join client c on task.responsible = c.login;
 
 --10
 
 --inserted
-select task.header, client.login, task.responsible
-from client,
-     task
-where client.login = task.creator;
+select login
+from client
+where login in (select responsible from task where priority > 80);
 
 --simple
 select task.header, project.header
@@ -200,6 +189,6 @@ from task,
 where task.header = project.header;
 
 --relation
-select login
+select login, department
 from client
-where login in (select responsible from task where priority > 80);
+where login in (select responsible from task where client.department = 'администрация');
