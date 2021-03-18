@@ -87,10 +87,9 @@ group by client.login, extract(MONTH from data_beginning);
 
 --3
 -- cost - затрачено/ mark - оценка, сколько нужно затратить
-
-select login id_executor,
-       (sum(mark - cost) + abs(sum(mark - cost))) / 2 as "-",
-       (sum(cost - mark) + abs(sum(cost - mark))) / 2 as "+"
+select login                                          id_executor,
+       (sum(mark - cost) + abs(sum(mark - cost))) / 2 "-",
+       (sum(cost - mark) + abs(sum(cost - mark))) / 2 "+"
 from client,
      task
 where client.login = responsible
@@ -106,15 +105,11 @@ group by login;
 
 --4
 
-select creator,
-       responsible
-from task
-group by creator, responsible;
-
-
-(select creator, responsible from task where creator > task.responsible) union
-(select creator, responsible from task where creator < task.responsible) union
-(select creator, responsible from task where creator = task.responsible);
+    (select creator, responsible from task where creator > task.responsible)
+    union
+    (select creator, responsible from task where creator < task.responsible)
+    union
+    (select creator, responsible from task where creator = task.responsible);
 
 --5
 
