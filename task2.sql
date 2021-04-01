@@ -105,11 +105,7 @@ group by login;
 
 --4
 
-    (select creator, responsible from task where creator > task.responsible)
-    union
-    (select creator, responsible from task where creator < task.responsible)
-    union
-    (select creator, responsible from task where creator = task.responsible);
+    (select creator, responsible from task where creator > task.responsible);
 
 --5
 
@@ -154,22 +150,46 @@ from client,
 where task.responsible = client.login
 group by login, responsible;
 
---8
+---8
 
 select responsible, sum(mark)
-from task,
-     (select avg(mark) from task) as average
-group by responsible, mark, average.avg
-having mark > average.avg;
+from task
+group by responsible, mark
+having (mark > (select avg(mark) from task));
 
 --9
 drop view if exists table_view;
 
 create view table_view as
-select *
-from task
-         join client c on task.responsible = c.login;
+select task.responsible,
+       count(task.responsible) as amount,
 
+       (select count(compl.responsible)
+        from (select responsible from task where (mark - task.cost < 0)) as compl where compl.responsible = task.responsible group by compl.responsible) as complite,
+
+       (select count(delay.responsible)
+        from (select responsible from task where (mark - task.cost > 0)) as delay where delay.responsible = task.responsible group by delay.responsible) as delay,
+
+       (select count(opn.responsible)
+        from (select responsible from task where (condition = 'открыта')) as opn where opn.responsible = task.responsible group by opn.responsible) as open,
+
+       (select count(cls.responsible)
+        from (select responsible from task where (condition = 'закрыта')) as cls where cls.responsible = task.responsible group by cls.responsible) as close,
+
+       (select count(prcs.responsible)
+        from (select responsible from task where (condition = 'выполняется')) as prcs where prcs.responsible = task.responsible group by prcs.responsible) as in_process,
+
+       (select sum(tsk_cost.cost) from (select cost, responsible from task) as tsk_cost where tsk_cost.responsible = task.responsible group by tsk_cost.responsible) as sum_cost,
+
+       (select sum(more.dif)
+        from (select -1 * (mark - cost) as dif, responsible from task where (mark - task.cost) < 0) as more where more.responsible = task.responsible group by more.responsible) as mark_cost,
+
+       (select sum(less.dif)
+        from (select -1 * (cost - mark) as dif, responsible from task where (mark - cost) > 0) as less where less.responsible = task.responsible group by less.responsible) as cost_mark,
+
+       (select avg(priority) from (select priority, responsible from task) as average where average.responsible = task.responsible group by average.responsible)
+from task
+group by responsible;
 --10
 
 --inserted
