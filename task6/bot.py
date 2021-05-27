@@ -1,5 +1,7 @@
 import datetime
 import random
+import re
+
 import config
 import telebot
 from telebot import types
@@ -35,29 +37,24 @@ cur.executescript('''CREATE TABLE IF NOT EXISTS picdata
     FOREIGN KEY (Id) REFERENCES userdata(Id));'''
                   )
 
-cur.execute('''DROP TABLE IF EXISTS questionnaire;''')
-cur.execute('''DROP TABLE IF EXISTS question;''')
+# cur.execute('''DROP TABLE IF EXISTS questionnaire;''')
+# cur.execute('''DROP TABLE IF EXISTS question;''')
 
 cur.executescript('''CREATE TABLE IF NOT EXISTS question
     (
     Num INTEGER SERIAL, 
     Id INTEGER NOT NULL,
-    Theme VARCHAR,
-    Answer VARCHAR,
     Question VARCHAR,
     FOREIGN KEY (Id) REFERENCES userdata (Id));'''
                   )
 
 cur.executescript('''CREATE TABLE IF NOT EXISTS questionnaire
     (
-    Num INTEGER SERIAL, 
     Id INTEGER NOT NULL,
-    Theme VARCHAR,
     Answer VARCHAR,
     Question VARCHAR,
     FOREIGN KEY (Id) REFERENCES userdata (Id));'''
                   )
-
 
 user_data = {}
 pic_data = {}
@@ -97,50 +94,47 @@ def talki_start(message):
 
 
 def talki_question(message):
-    # try:
+    try:
         user_id = message.from_user.id
-        quest = cur.execute('''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire WHERE Id = ?)''',
-            (user_id)).fetchall()
-        print(1, quest)
+        quest = cur.execute(
+            '''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire)''').fetchall()
         if len(quest) > 0:
             markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
             markup.add('Yes', 'No', 'Stop')
-            rand_q = random.choice(quest)
+            rand_q = re.sub("['|(|,|)]", "", str(random.choice(quest)))
             cur.execute('''INSERT INTO questionnaire (Id, Question) VALUES (?, ?)''',
-                        (user_id, random.choice(quest)))
+                        (user_id, rand_q))
             conn.commit()
-            print(rand_q)
             msg = bot.send_message(message.chat.id, rand_q, reply_markup=markup)
             bot.register_next_step_handler(msg, talki_answer)
         else:
-            person = cur.execute('''SELECT Answer FROM questionnaire WHERE Answer = 'Yes' AND QId = ?''',
+            person = cur.execute('''SELECT Answer FROM questionnaire WHERE Answer = 'Yes' AND Id = ?''',
                                  (user_id,)).fetchall()
-            if (len(person) > 0) and (len(person) < 5):
+            count_q = cur.execute('''SELECT Question FROM question''').fetchall()
+            if len(person) > len(count_q) / 2:
                 person = 'Introvert'
             else:
                 person = 'Extravert'
-            msg = bot.send_message(message.chat.id, 'You have already passed the personality test, you ' + person)
-    # except Exception as e:
-    #     bot.send_message(message.chat.id, 'oooops, smth went wrong')
+            msg = bot.send_message(message.chat.id, 'Congrats! Your personality is ' + person)
+    except Exception as e:
+        bot.send_message(message.chat.id, 'oooops, smth went wrong')
 
 
 def talki_answer(message):
-    # try:
+    try:
         user_id = message.from_user.id
         answer = message.text
         if answer in (u'Yes', u'No'):
-            cur.execute('''INSERT INTO questionnaire (Answer) VALUES (?) WHERE Answer = NULL AND Id = ?''',
+            cur.execute('''UPDATE questionnaire SET Answer = ? WHERE Answer = NULL AND Id = ?''',
                         (answer, user_id))
             conn.commit()
-            pr = cur.execute('''SELECT Question FROM questionnaire''').fetchall()
-            print(pr)
-            quest = cur.execute('''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire WHERE Id = ?)''',
+            quest = cur.execute(
+                '''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire WHERE Id = ?)''',
                 (user_id,)).fetchall()
-            print(2, quest)
             if len(quest) > 0:
                 markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
                 markup.add('Yes', 'No', 'Stop')
-                rand_q = random.choice(quest)
+                rand_q = re.sub("['|(|,|)]", "", str(random.choice(quest)))
                 cur.execute('''INSERT INTO questionnaire (Id, Question) VALUES (?, ?)''',
                             (user_id, rand_q))
                 conn.commit()
@@ -148,20 +142,20 @@ def talki_answer(message):
                 bot.register_next_step_handler(msg, talki_answer)
             else:
                 person = cur.execute('''SELECT Answer FROM questionnaire WHERE Answer = 'Yes' AND Id = ?''',
-                                     (message.from_user.id,)).fetchall()
+                                     (user_id,)).fetchall()
                 count_q = cur.execute('''SELECT Question FROM question''').fetchall()
-                if len(person) < len(count_q) / 2:
+                if len(person) > len(count_q) / 2:
                     person = 'Introvert'
                 else:
                     person = 'Extravert'
-            msg = bot.send_message(message.chat.id, 'Congrats! Your personality is ' + person)
+                msg = bot.send_message(message.chat.id, 'Congrats! Your personality is ' + person)
         elif answer == u'Stop':
             msg = bot.send_message(message.chat.id, 'Your data has been recorded, come back later, we will continue!')
         else:
             msg = bot.send_message(message.chat.id, 'I do not know such cases, try again')
             bot.register_next_step_handler(msg, talki_answer)
-    # except Exception as e:
-    #     bot.send_message(message.chat.id, 'oooops, smth went wrong')
+    except Exception as e:
+        bot.send_message(message.chat.id, 'oooops, smth went wrong')
 
 
 @bot.message_handler(commands=['delansw'])
@@ -185,22 +179,10 @@ def delq(message):
 
 
 @bot.message_handler(commands=['question'])
-def talki_theme(message):
-    try:
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-        markup.add('Good', 'Bad')
-        msg = bot.send_message(message.chat.id, 'What is your theme: ', reply_markup=markup)
-        bot.register_next_step_handler(msg, talki_add)
-    except Exception as e:
-        bot.send_message(message.chat.id, 'oooops, smth went wrong')
-
-
 def talki_add(message):
     try:
-        answer = message.text
-        if answer in (u'Good', u'Bad'):
-            msg = bot.send_message(message.chat.id, 'What is your question: ')
-            bot.register_next_step_handler(msg, talki_new_q)
+        msg = bot.send_message(message.chat.id, 'What is your question: ')
+        bot.register_next_step_handler(msg, talki_new_q)
     except Exception as e:
         bot.send_message(message.chat.id, 'oooops, smth went wrong')
 
@@ -334,7 +316,8 @@ def process_sex_step(message):
         if (sex == u'Male') or (sex == u'Female'):
             user.sex = sex
         else:
-            raise Exception("Unknown sex")
+            msg = bot.send_message(message.chat.id, 'Unknown sex, try again')
+            bot.register_next_step_handler(msg, process_sex_step)
         cur.execute('''INSERT INTO userdata (Id, Name, Age, Sex) VALUES (?, ?, ?, ?)''',
                     (user_id, user.name, user.age, user.sex))
         conn.commit()
