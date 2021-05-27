@@ -1,7 +1,7 @@
 To use this application, you should:
 1) follow the link to the telegram bot: https://t.me/fordbprojectbot
 2) to write: /help - this command will show what functions this bot has
-3) short description:                       (use / before commands)
+3) short description: !!!use / before commands and don't forgget use buttons!!!
                                             start - user registration
                                             reset - deleting a user from the database
                                             addpic - adding an image via url
