@@ -1,0 +1,18 @@
+To use this application, you should:
+1) follow the link to the telegram bot: https://t.me/fordbprojectbot
+2) to write: /help - this command will show what functions this bot has
+3) short description:                       (use / before commands)
+                                            start - user registration
+                                            reset - deleting a user from the database
+                                            addpic - adding an image via url
+                                            sentpic - sending a picture
+                                            echo - echo message recording with time storing
+                                             to stop recording sent: stop (without slash)
+                                             to send the recorded data: senddata
+                                             to dump records: empty
+                                            talki - start little personality test :)
+                                            question - add question
+                                            delq - deleted your questions
+                                            delansw - deleted your questionnaire
+
+4) for the bot to start its work, you need to run the bot.py programm
