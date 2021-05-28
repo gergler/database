@@ -14,5 +14,6 @@ To use this application, you should:
                                             question - add question
                                             delq - deleted your questions
                                             delansw - deleted your questionnaire
+                                            delquestion - deleted choosen question 
 
 4) for the bot to start its work, you need to run the bot.py programm
