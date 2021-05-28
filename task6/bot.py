@@ -96,8 +96,7 @@ def talki_start(message):
 def talki_question(message):
     try:
         user_id = message.from_user.id
-        quest = cur.execute(
-            '''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire)''').fetchall()
+        quest = cur.execute('''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire WHERE Id = ?)''', (user_id,)).fetchall()
         if len(quest) > 0:
             markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
             markup.add('Yes', 'No', 'Stop')
@@ -108,10 +107,11 @@ def talki_question(message):
             msg = bot.send_message(message.chat.id, rand_q, reply_markup=markup)
             bot.register_next_step_handler(msg, talki_answer)
         else:
-            person = cur.execute('''SELECT Answer FROM questionnaire WHERE Answer = 'Yes' AND Id = ?''',
+            person = cur.execute('''SELECT Answer FROM questionnaire WHERE like '%No%' AND Id = ?''',
                                  (user_id,)).fetchall()
+            print(person)
             count_q = cur.execute('''SELECT Question FROM question''').fetchall()
-            if len(person) > len(count_q) / 2:
+            if len(person) >= len(count_q) / 2:
                 person = 'Introvert'
             else:
                 person = 'Extravert'
@@ -125,12 +125,10 @@ def talki_answer(message):
         user_id = message.from_user.id
         answer = message.text
         if answer in (u'Yes', u'No'):
-            cur.execute('''UPDATE questionnaire SET Answer = ? WHERE Answer = NULL AND Id = ?''',
-                        (answer, user_id))
+            cur.execute('''UPDATE questionnaire SET Answer = ? WHERE Answer IS NULL AND Id = ?''', (answer, user_id))
             conn.commit()
-            quest = cur.execute(
-                '''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire WHERE Id = ?)''',
-                (user_id,)).fetchall()
+            quest = cur.execute('''SELECT Question FROM question WHERE Question NOT IN (SELECT Question FROM questionnaire WHERE Id = ?)''', (user_id,)).fetchall()
+            print(quest)
             if len(quest) > 0:
                 markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
                 markup.add('Yes', 'No', 'Stop')
@@ -141,10 +139,11 @@ def talki_answer(message):
                 msg = bot.send_message(message.chat.id, rand_q, reply_markup=markup)
                 bot.register_next_step_handler(msg, talki_answer)
             else:
-                person = cur.execute('''SELECT Answer FROM questionnaire WHERE Answer = 'Yes' AND Id = ?''',
+                person = cur.execute('''SELECT Answer FROM questionnaire WHERE Answer like '%No%' AND Id = ?''',
                                      (user_id,)).fetchall()
+                print(person)
                 count_q = cur.execute('''SELECT Question FROM question''').fetchall()
-                if len(person) > len(count_q) / 2:
+                if len(person) >= len(count_q) / 2:
                     person = 'Introvert'
                 else:
                     person = 'Extravert'
@@ -165,7 +164,7 @@ def delansw(message):
         conn.commit()
         msg = bot.send_message(message.chat.id, "Your questionnaire was deleted!")
     except Exception as e:
-        bot.send_message(message.chat.id, 'oooops, sorry, we can not start over')
+        bot.send_message(message.chat.id, 'oooops, smth went wrong')
 
 
 @bot.message_handler(commands=['delq'])
@@ -175,7 +174,27 @@ def delq(message):
         conn.commit()
         msg = bot.send_message(message.chat.id, "Your question's was deleted!")
     except Exception as e:
-        bot.send_message(message.chat.id, 'oooops, sorry, we can not start over')
+        bot.send_message(message.chat.id, 'oooops, smth went wrong')
+
+
+@bot.message_handler(commands=['delquestion'])
+def which_q(message):
+    try:
+        msg = bot.send_message(message.chat.id, "Which question you want to delete?")
+        bot.register_next_step_handler(msg, del_question)
+    except Exception as e:
+        bot.send_message(message.chat.id, 'oooops, smth went wrong')
+
+def del_question(message):
+    try:
+        question = message.text
+        cur.execute('''DELETE FROM question WHERE Id = ? AND Question = ?''', (message.from_user.id, question))
+        conn.commit()
+        cur.execute('''DELETE FROM questionnaire WHERE Id = ? AND Question = ?''', (message.from_user.id, question))
+        conn.commit()
+        msg = bot.send_message(message.chat.id, "Your question was deleted!")
+    except Exception as e:
+        bot.send_message(message.chat.id, 'oooops, smth went wrong')
 
 
 @bot.message_handler(commands=['question'])
